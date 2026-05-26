@@ -1,6 +1,8 @@
 package simplerag.service;
 
+import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
 import io.quarkiverse.langchain4j.RegisterAiService;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,7 +25,14 @@ public class SemanticSearchService {
 
     @RegisterAiService
     public interface Assistant {
-        String chat(@UserMessage String message);
+        @SystemMessage("""
+            Answer the user question based strictly on the context (Markdown) provided below.
+            Produce Markdown if answer expected to be long or highly structured.
+        
+            Context:
+            {context}
+        """)
+        String chat(@V("context") String context, @UserMessage String message);
     }
 
     public AskResultDto askWithContext(String userQuestion) {
@@ -34,19 +43,10 @@ public class SemanticSearchService {
         }
 
         String context = documents.stream()
-                .map(doc -> "- " + doc.content())
+                .map(DocumentDto::content)
                 .collect(Collectors.joining("\n"));
 
-        var enrichedPrompt = String.format("""
-            Answer the user question based strictly on the context provided below.
-            
-            Context:
-            %s
-            
-            User Question: %s
-            """, context, userQuestion);
-
-        var aiResponse = assistant.chat(enrichedPrompt);
+        var aiResponse = assistant.chat(context, userQuestion);
 
         List<String> urls = documents.stream()
                 .map(DocumentDto::url)
