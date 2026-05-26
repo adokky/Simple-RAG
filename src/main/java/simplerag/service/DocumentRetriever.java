@@ -1,5 +1,6 @@
 package simplerag.service;
 
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.rag.AugmentationRequest;
 import dev.langchain4j.rag.AugmentationResult;
@@ -14,7 +15,7 @@ public class DocumentRetriever implements RetrievalAugmentor {
 
     private final RetrievalAugmentor augmentor;
 
-    DocumentRetriever(EmbeddingStore store, EmbeddingModel model) {
+    DocumentRetriever(EmbeddingStore<TextSegment> store, EmbeddingModel model) {
         EmbeddingStoreContentRetriever contentRetriever = EmbeddingStoreContentRetriever.builder()
                 .embeddingModel(model)
                 .embeddingStore(store)

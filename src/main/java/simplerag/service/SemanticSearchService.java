@@ -32,7 +32,7 @@ public class SemanticSearchService {
             Context:
             {context}
         """)
-        String chat(@V("context") String context, @UserMessage String message);
+        String ask(@V("context") String context, @UserMessage String message);
     }
 
     public AskResultDto askWithContext(String userQuestion) {
@@ -46,7 +46,7 @@ public class SemanticSearchService {
                 .map(DocumentDto::content)
                 .collect(Collectors.joining("\n"));
 
-        var aiResponse = assistant.chat(context, userQuestion);
+        var aiResponse = assistant.ask(context, userQuestion);
 
         List<AskResultDto.Link> urls = documents.stream()
                 .map(doc -> new AskResultDto.Link(doc.url(), doc.path()))

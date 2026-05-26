@@ -8,12 +8,8 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import dev.langchain4j.store.embedding.filter.comparison.IsEqualTo;
-import io.quarkus.runtime.Startup;
-import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Singleton;
-
-import static dev.langchain4j.data.document.splitter.DocumentSplitters.recursive;
+import jakarta.transaction.Transactional;
 
 @ApplicationScoped
 class DocumentLoader {
@@ -33,10 +29,12 @@ class DocumentLoader {
                 .build();
     }
 
+    @Transactional
     void loadDocument(String html, String url) {
-        var doc = Document.document(html, Metadata.metadata("url", url));
+        var doc = Document.document(html, Metadata.metadata(DocumentTags.URL, url));
 
-        store.removeAll(new IsEqualTo("url", url));
+        store.removeAll(new IsEqualTo(DocumentTags.URL, url));
+
         ingestor.ingest(doc);
     }
 }
