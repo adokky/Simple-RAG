@@ -143,7 +143,11 @@ public class DocumentParser {
         }
 
         doc.content = pathParts.getLast() + content;
-        doc.embedding = embeddingModel.embed("# " + doc.id.sectionName + content).content().vector();
+
+        doc.embedding = embeddingModel
+                .embed("# %s\n\n%s".formatted(doc.id.sectionName, content))
+                .content()
+                .vector();
 
         sections.add(doc);
     }
