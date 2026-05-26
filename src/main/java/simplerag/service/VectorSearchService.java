@@ -43,14 +43,14 @@ public class VectorSearchService {
 
         return res.matches().stream().map((doc) -> {
                 var meta = doc.embedded().metadata();
-                var url =  meta.getString("url");
-                var anchor = meta.getString("anchor");
+                var url =  meta.getString(DocumentTags.URL);
+                var anchor = meta.getString(DocumentTags.ANCHOR);
                 if (anchor != null) {
                     url = url + "#" + anchor;
                 }
                 return new DocumentDto(
                         url,
-                        meta.getString("sectionName"),
+                        meta.getString(DocumentTags.SECTION_PATH),
                         doc.embedded().text()
                 );
             }

@@ -2,8 +2,13 @@ package simplerag.service;
 
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.data.document.Document;
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.helper.Validate;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,7 +18,7 @@ class DocumentParserTest {
 
     private List<TextSegment> split(String html) {
         var result = Document.document(html);
-        result.metadata().put("url", "http://example.com");
+        result.metadata().put(DocumentTags.URL, "http://example.com");
         return documentParser.split(result);
     }
 
@@ -31,9 +36,9 @@ class DocumentParserTest {
 
         assertEquals(1, segments.size());
         TextSegment section = segments.getFirst();
-        assertEquals("Main Title", section.metadata().getString("sectionName"));
-        assertEquals("http://example.com", section.metadata().getString("url"));
-        assertEquals("Main TitleThis is the main content.\nMore details here.", section.text());
+        assertEquals("Main Title", section.metadata().getString(DocumentTags.SECTION_PATH));
+        assertEquals("http://example.com", section.metadata().getString(DocumentTags.URL));
+        assertEquals("# Main Title\n\nThis is the main content.\nMore details here.", section.text());
     }
 
     @Test
@@ -55,10 +60,10 @@ class DocumentParserTest {
 
         assertEquals(4, segments.size());
 
-        assertEquals("Chapter 1", segments.get(0).metadata().getString("sectionName"));
-        assertEquals("Chapter 1. Section 1.1", segments.get(1).metadata().getString("sectionName"));
-        assertEquals("Chapter 1. Section 1.1. Subsection 1.1.1", segments.get(2).metadata().getString("sectionName"));
-        assertEquals("Chapter 1. Section 1.2", segments.get(3).metadata().getString("sectionName"));
+        assertEquals("Chapter 1", segments.get(0).metadata().getString(DocumentTags.SECTION_PATH));
+        assertEquals("Chapter 1. Section 1.1", segments.get(1).metadata().getString(DocumentTags.SECTION_PATH));
+        assertEquals("Chapter 1. Section 1.1. Subsection 1.1.1", segments.get(2).metadata().getString(DocumentTags.SECTION_PATH));
+        assertEquals("Chapter 1. Section 1.2", segments.get(3).metadata().getString(DocumentTags.SECTION_PATH));
     }
 
     @Test
@@ -77,7 +82,7 @@ class DocumentParserTest {
                 """);
 
         assertEquals(2, segments.size());
-        assertFalse(segments.stream().anyMatch(e -> e.metadata().getString("sectionName").contains("Related content")));
+        assertFalse(segments.stream().anyMatch(e -> e.metadata().getString(DocumentTags.SECTION_PATH).contains("Related content")));
     }
 
     @Test
@@ -94,8 +99,8 @@ class DocumentParserTest {
                 """);
 
         assertEquals(2, segments.size());
-        assertEquals("intro", segments.get(0).metadata().getString("anchor"));
-        assertEquals("usage", segments.get(1).metadata().getString("anchor"));
+        assertEquals("intro", segments.get(0).metadata().getString(DocumentTags.ANCHOR));
+        assertEquals("usage", segments.get(1).metadata().getString(DocumentTags.ANCHOR));
     }
 
     @Test
@@ -114,5 +119,30 @@ class DocumentParserTest {
                 """);
 
         assertEquals(0, segments.size());
+    }
+
+    @Test
+    @Disabled("for debugging purposes only")
+    void printExample() {
+        String html;
+        try {
+            var conn = Jsoup.connect("https://quarkus.io/guides/cdi")
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            conn.request().method(Connection.Method.GET);
+            conn.execute();
+            Validate.notNull(conn.request());
+            html = conn.response().body();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        List<TextSegment> segments = split(html);
+
+        for (var segment : segments) {
+            for (int i = 0; i < 10; i++) {
+                System.out.println();
+            }
+            System.out.println(segment.text());
+        }
     }
 }

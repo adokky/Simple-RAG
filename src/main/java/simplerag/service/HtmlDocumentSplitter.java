@@ -20,7 +20,7 @@ class HtmlDocumentSplitter implements DocumentSplitter {
 
     @Override
     public List<TextSegment> split(Document document) {
-        String url = document.metadata().getString("url");
+        String url = document.metadata().getString(DocumentTags.URL);
         Element body = Jsoup.parse(document.text()).body();
 
         List<TextSegment> result = new ArrayList<>();
@@ -130,19 +130,20 @@ class HtmlDocumentSplitter implements DocumentSplitter {
 
         // peekFirst() — текущий заголовок (самый глубокий)
         String anchor = headingStack.peekFirst().anchor();
-        String sectionName = String.join(". ", pathParts);
+        String path = String.join(". ", pathParts);
 
         var meta = Metadata.from(Map.of(
-                "sectionName", sectionName,
-                "url", url,
-                "title", pathParts.getLast()
+                DocumentTags.SECTION_PATH, path,
+                DocumentTags.URL, url,
+                DocumentTags.TITLE, pathParts.getLast()
         ));
 
         if (anchor != null) {
-            meta.put("anchor", anchor);
+            meta.put(DocumentTags.ANCHOR, anchor);
         }
 
-        sections.add(TextSegment.from("# %s\n\n%s".formatted(sectionName, content), meta));
+        var text = "# %s\n\n%s".formatted(path, content);
+        sections.add(TextSegment.from(text, meta));
     }
 
     private record HeadingInfo(int level, String text, @Nullable String anchor) {

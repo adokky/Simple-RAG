@@ -48,8 +48,8 @@ public class SemanticSearchService {
 
         var aiResponse = assistant.chat(context, userQuestion);
 
-        List<String> urls = documents.stream()
-                .map(DocumentDto::url)
+        List<AskResultDto.Link> urls = documents.stream()
+                .map(doc -> new AskResultDto.Link(doc.url(), doc.path()))
                 .distinct()
                 .toList();
 
