@@ -1,36 +1,35 @@
 package simplerag.service;
 
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
-import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.DocumentSplitter;
+import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.segment.TextSegment;
 import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.jsoup.nodes.Document;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
-import simplerag.dao.DocumentEmbedding;
-import simplerag.dao.DocumentEmbeddingId;
 
 import java.util.*;
 
 @ApplicationScoped
-public class DocumentParser {
+class HtmlDocumentSplitter implements DocumentSplitter {
     private final FlexmarkHtmlConverter converter = FlexmarkHtmlConverter.builder().build();
 
-    private final EmbeddingModel embeddingModel;
+    @Override
+    public List<TextSegment> split(Document document) {
+        String url = document.metadata().getString("url");
+        Element body = Jsoup.parse(document.text()).body();
 
-    DocumentParser(EmbeddingModel embeddingModel) {
-        this.embeddingModel = embeddingModel;
-    }
-
-    public List<DocumentEmbedding> parse(Document doc, String url) {
-        List<DocumentEmbedding> result = new ArrayList<>();
+        List<TextSegment> result = new ArrayList<>();
 
         Deque<HeadingInfo> headingStack = new ArrayDeque<>();
         StringBuilder currentSectionContent = new StringBuilder();
 
         // Убираем структурные div. Итерируемся depth-first, чтобы получить физический порядок тегов
-        List<Node> flatNodes = flattenDom(doc.body());
+        List<Node> flatNodes = flattenDom(body);
 
         for (Node node : flatNodes) {
             if (node instanceof Element element && isHeading(element)) {
@@ -110,11 +109,13 @@ public class DocumentParser {
     }
 
     private void flushCurrentSection(
-            List<DocumentEmbedding> sections,
+            List<TextSegment> sections,
             Deque<HeadingInfo> headingStack,
             StringBuilder contentBuilder,
             String url
     ) {
+        Objects.requireNonNull(url);
+
         String content = contentBuilder.toString().trim();
         contentBuilder.setLength(0);
 
@@ -130,27 +131,19 @@ public class DocumentParser {
         // peekFirst() — текущий заголовок (самый глубокий)
         String anchor = headingStack.peekFirst().anchor();
 
-        var doc = new DocumentEmbedding();
+        var meta = Metadata.from(Map.of(
+                "sectionName", String.join(". ", pathParts),
+                "url", url,
+                "title", pathParts.getLast()
+        ));
 
-        doc.id = new DocumentEmbeddingId();
-        doc.id.sectionName = String.join(". ", pathParts);
-        doc.id.url = url;
-
-        doc.metadata = new HashMap<>(4);
-        doc.metadata.put("title", pathParts.getLast());
         if (anchor != null) {
-            doc.metadata.put("anchor", anchor);
+            meta.put("anchor", anchor);
         }
 
-        doc.content = pathParts.getLast() + content;
-
-        doc.embedding = embeddingModel
-                .embed("# %s\n\n%s".formatted(doc.id.sectionName, content))
-                .content()
-                .vector();
-
-        sections.add(doc);
+        sections.add(TextSegment.from(pathParts.getLast() + content, meta));
     }
 
-    private record HeadingInfo(int level, String text, @Nullable String anchor) {}
+    private record HeadingInfo(int level, String text, @Nullable String anchor) {
+    }
 }

@@ -1,37 +1,25 @@
 package simplerag.service;
 
-import dev.langchain4j.data.embedding.Embedding;
-import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.embedding.onnx.bgesmallenv15.BgeSmallEnV15EmbeddingModel;
-import dev.langchain4j.model.output.Response;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.junit.jupiter.api.BeforeEach;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.data.document.Document;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import simplerag.dao.DocumentEmbedding;
 
-import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class DocumentParserTest {
-    private DocumentParser documentParser;
+    private HtmlDocumentSplitter documentParser = new HtmlDocumentSplitter();
 
-    @BeforeEach
-    void setUp() {
-        EmbeddingModel embeddingModel = Mockito.mock(EmbeddingModel.class);
-        when(embeddingModel.embed(Mockito.anyString()))
-                .thenReturn(Response.from(Embedding.from(new float[]{0.1f, 0.2f, 0.3f})));
-
-        documentParser = new DocumentParser(embeddingModel);
+    private List<TextSegment> split(String html) {
+        var result = Document.document(html);
+        result.metadata().put("url", "http://example.com");
+        return documentParser.split(result);
     }
 
     @Test
     void shouldParseSingleHeadingWithContent() {
-        String html = """
+        List<TextSegment> segments = split("""
                 <html>
                 <body>
                     <h1>Main Title</h1>
@@ -39,23 +27,18 @@ class DocumentParserTest {
                     <p>More details here.</p>
                 </body>
                 </html>
-                """;
+                """);
 
-        Document doc = Jsoup.parse(html);
-        List<DocumentEmbedding> embeddings = documentParser.parse(doc, "https://example.com");
-
-        assertEquals(1, embeddings.size());
-        DocumentEmbedding section = embeddings.getFirst();
-        assertEquals("Main Title", section.id.sectionName);
-        assertEquals("https://example.com", section.id.url);
-        assertEquals("Main TitleThis is the main content.\nMore details here.", section.content);
-        assertEquals("Main Title", section.metadata.get("title"));
-        assertArrayEquals(new float[]{0.1f, 0.2f, 0.3f}, section.embedding, 0.001f);
+        assertEquals(1, segments.size());
+        TextSegment section = segments.getFirst();
+        assertEquals("Main Title", section.metadata().getString("sectionName"));
+        assertEquals("http://example.com", section.metadata().getString("url"));
+        assertEquals("Main TitleThis is the main content.\nMore details here.", section.text());
     }
 
     @Test
     void shouldParseNestedHeadingsAndBuildPath() {
-        String html = """
+        List<TextSegment> segments = split("""
                 <html>
                 <body>
                     <h1>Chapter 1</h1>
@@ -68,22 +51,19 @@ class DocumentParserTest {
                     <p>Another section.</p>
                 </body>
                 </html>
-                """;
+                """);
 
-        Document doc = Jsoup.parse(html);
-        List<DocumentEmbedding> embeddings = documentParser.parse(doc, "https://example.com/chapter1");
+        assertEquals(4, segments.size());
 
-        assertEquals(4, embeddings.size());
-
-        assertEquals("Chapter 1", embeddings.get(0).id.sectionName);
-        assertEquals("Chapter 1. Section 1.1", embeddings.get(1).id.sectionName);
-        assertEquals("Chapter 1. Section 1.1. Subsection 1.1.1", embeddings.get(2).id.sectionName);
-        assertEquals("Chapter 1. Section 1.2", embeddings.get(3).id.sectionName);
+        assertEquals("Chapter 1", segments.get(0).metadata().getString("sectionName"));
+        assertEquals("Chapter 1. Section 1.1", segments.get(1).metadata().getString("sectionName"));
+        assertEquals("Chapter 1. Section 1.1. Subsection 1.1.1", segments.get(2).metadata().getString("sectionName"));
+        assertEquals("Chapter 1. Section 1.2", segments.get(3).metadata().getString("sectionName"));
     }
 
     @Test
     void shouldSkipRelatedContentSection() {
-        String html = """
+        List<TextSegment> segments = split("""
                 <html>
                 <body>
                     <h1>Start</h1>
@@ -94,18 +74,15 @@ class DocumentParserTest {
                     <p>This should be included.</p>
                 </body>
                 </html>
-                """;
+                """);
 
-        Document doc = Jsoup.parse(html);
-        List<DocumentEmbedding> embeddings = documentParser.parse(doc, "https://example.com");
-
-        assertEquals(2, embeddings.size());
-        assertFalse(embeddings.stream().anyMatch(e -> e.id.sectionName.contains("Related content")));
+        assertEquals(2, segments.size());
+        assertFalse(segments.stream().anyMatch(e -> e.metadata().getString("sectionName").contains("Related content")));
     }
 
     @Test
     void shouldHandleAnchorsFromIdOrName() {
-        String html = """
+        List<TextSegment> segments = split("""
                 <html>
                 <body>
                     <h2 id="intro">Introduction</h2>
@@ -114,19 +91,16 @@ class DocumentParserTest {
                     <p>How to use.</p>
                 </body>
                 </html>
-                """;
+                """);
 
-        Document doc = Jsoup.parse(html);
-        List<DocumentEmbedding> embeddings = documentParser.parse(doc, "https://example.com");
-
-        assertEquals(2, embeddings.size());
-        assertEquals("intro", embeddings.get(0).metadata.get("anchor"));
-        assertEquals("usage", embeddings.get(1).metadata.get("anchor"));
+        assertEquals(2, segments.size());
+        assertEquals("intro", segments.get(0).metadata().getString("anchor"));
+        assertEquals("usage", segments.get(1).metadata().getString("anchor"));
     }
 
     @Test
     void shouldIgnoreEmptySections() {
-        String html = """
+        List<TextSegment> segments = split("""
                 <html>
                 <body>
                     <h1>Title</h1>
@@ -137,41 +111,8 @@ class DocumentParserTest {
                     <h2>Section</h2>
                 </body>
                 </html>
-                """;
+                """);
 
-        Document doc = Jsoup.parse(html);
-        List<DocumentEmbedding> embeddings = documentParser.parse(doc, "https://example.com");
-
-        assertEquals(0, embeddings.size());
-    }
-
-    void test() {
-        var ingestor = new DocumentParser(
-                new BgeSmallEnV15EmbeddingModel()
-        );
-
-        Document html;
-        try {
-            html = Jsoup.connect("https://quarkus.io/guides/cdi")
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                    .get();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        var docs = ingestor.parse(html, "https://quarkus.io/guides/cdi");
-
-        for (var doc : docs) {
-            for (int i = 0; i < 10; i++) {
-                System.out.println();
-            }
-
-            System.out.println(doc.id.sectionName);
-            if (!doc.metadata.isEmpty()) {
-                System.out.println("META: " +  doc.metadata);
-            }
-            System.out.println();
-            System.out.println(doc.content);
-        }
+        assertEquals(0, segments.size());
     }
 }
