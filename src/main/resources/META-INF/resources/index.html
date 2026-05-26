@@ -123,7 +123,8 @@
             responseHtml += '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 14px;">';
             responseHtml += '<strong>Источники:</strong><br>';
             data.links.forEach(link => {
-              responseHtml += `<a href="${link}" target="_blank">→ ${link}</a><br>`;
+              let name = link.name == null ? link.url : link.name;
+              responseHtml += `<a href="${link.url}" target="_blank">→ ${name}</a><br>`;
             });
             responseHtml += '</div>';
           }

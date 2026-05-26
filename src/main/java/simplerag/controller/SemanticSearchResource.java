@@ -66,8 +66,8 @@ public class SemanticSearchResource {
     @Produces(MediaType.TEXT_PLAIN)
     public Response ingestExternalGuide(@QueryParam("url") URL targetUrl) {
         try {
-            int count = vectorSearchService.ingest(targetUrl);
-            return Response.ok("Успешно собрано, загружено и разрезано на " + count + " структурных эмбеддингов").build();
+            vectorSearchService.ingest(targetUrl);
+            return Response.ok("Успешно собрано, загружено и разрезано на эмбеддинги").build();
         } catch (Exception e) {
             e.printStackTrace();
             return Response.serverError().entity("Ошибка при обработке сбора данных").build();
