@@ -130,9 +130,10 @@ class HtmlDocumentSplitter implements DocumentSplitter {
 
         // peekFirst() — текущий заголовок (самый глубокий)
         String anchor = headingStack.peekFirst().anchor();
+        String sectionName = String.join(". ", pathParts);
 
         var meta = Metadata.from(Map.of(
-                "sectionName", String.join(". ", pathParts),
+                "sectionName", sectionName,
                 "url", url,
                 "title", pathParts.getLast()
         ));
@@ -141,7 +142,7 @@ class HtmlDocumentSplitter implements DocumentSplitter {
             meta.put("anchor", anchor);
         }
 
-        sections.add(TextSegment.from(pathParts.getLast() + content, meta));
+        sections.add(TextSegment.from("# %s\n\n%s".formatted(sectionName, content), meta));
     }
 
     private record HeadingInfo(int level, String text, @Nullable String anchor) {

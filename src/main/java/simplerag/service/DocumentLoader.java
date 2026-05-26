@@ -25,7 +25,6 @@ class DocumentLoader {
                    DocumentSplitter documentSplitter) {
         this.store = store;
 
-        // TODO "# %s\n\n%s".formatted(doc.id.sectionName, content)
         this.ingestor = EmbeddingStoreIngestor
                 .builder()
                 .embeddingStore(store)
