@@ -27,6 +27,7 @@ OPENAI_API_KEY=<API key>
 OPENAI_BASE_URI=https://api.example.com
 OPENAI_MODEL_NAME=model-name
 
+# Тут можно задать любые данные если запускаем через quarkus:dev
 DB_USER=username
 DB_PASSWORD=12345678
 DB_NAME=simplerag
@@ -49,9 +50,7 @@ curl -X POST http://localhost:8080/ai/ingest --url-query "url=https://quarkus.io
 
 ### Задать вопрос
 
-В UI: http://localhost:8080/
-
-Или использовать curl:
+Используя curl:
 ```bash
 curl -X POST http://localhost:8080/ai/ask --url-query "q=What if multiple beans declare same type"
 ```
@@ -69,5 +68,7 @@ curl -X POST http://localhost:8080/ai/ask --url-query "q=What if multiple beans 
   ]
 }
 ```
+
+Или в UI: http://localhost:8080/
 
 ![screenshot](screen.jpg "Simple web UI")
