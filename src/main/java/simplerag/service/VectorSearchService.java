@@ -1,76 +1,82 @@
 package simplerag.service;
 
 import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
+import dev.langchain4j.store.embedding.EmbeddingStore;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.transaction.Transactional;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import simplerag.dao.DocumentEmbedding;
+import org.jsoup.helper.Validate;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Blocking
 @ApplicationScoped
 public class VectorSearchService {
     private final EmbeddingModel embeddingModel;
-    private final DocumentParser documentParser;
+    private final DocumentLoader documentLoader;
+    private final EmbeddingStore<TextSegment> embeddingStore;
 
-    VectorSearchService(EmbeddingModel embeddingModel, DocumentParser documentParser) {
+    VectorSearchService(EmbeddingModel embeddingModel, DocumentLoader documentLoader, EmbeddingStore<TextSegment> embeddingStore) {
         this.embeddingModel = embeddingModel;
-        this.documentParser = documentParser;
+        this.documentLoader = documentLoader;
+        this.embeddingStore = embeddingStore;
     }
 
     public List<DocumentDto> vectorSearch(String query, int max) {
         Embedding embedding = embeddingModel.embed(query).content();
-        var results = DocumentEmbedding.findClosest(embedding, max);
-        return results.stream().map((doc) -> {
-                var url =  doc.id.url;
-                var anchor = doc.metadata.get("anchor");
+
+        var res = embeddingStore.search(
+                EmbeddingSearchRequest.builder()
+                        .query(query)
+                        .queryEmbedding(embedding)
+                        .maxResults(max)
+                        .build()
+        );
+
+        return res.matches().stream().map((doc) -> {
+                var meta = doc.embedded().metadata();
+                var url =  meta.getString("url");
+                var anchor = meta.getString("anchor");
                 if (anchor != null) {
                     url = url + "#" + anchor;
                 }
                 return new DocumentDto(
                         url,
-                        doc.id.sectionName,
-                        doc.content,
-                        doc.metadata
-                                .entrySet()
-                                .stream()
-                                .collect(Collectors.toMap(
-                                        Map.Entry::getKey,
-                                        entry -> entry.getValue().toString()
-                                ))
+                        meta.getString("sectionName"),
+                        doc.embedded().text()
                 );
             }
         ).toList();
     }
 
-    public int ingest(URL targetUrl) {
+    public void ingest(URL targetUrl) {
         String urlString = formatUrl(targetUrl);
 
-        Document doc;
+        String html;
         try {
-            doc = Jsoup.connect(urlString)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                    .get();
+            var conn = Jsoup.connect(urlString)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            conn.request().method(Connection.Method.GET);
+            conn.execute();
+            Validate.notNull(conn.request());
+            html = conn.response().body();
         } catch (IOException e) {
             throw new RuntimeException("Не удалось загрузить страницу по указанному URL: " + urlString, e);
         }
 
-        var docs = documentParser.parse(doc, urlString);
-
-        persistAll(docs, urlString);
-
-        return docs.size();
+        try {
+            documentLoader.loadDocument(html, urlString);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String formatUrl(URL targetUrl) {
@@ -80,15 +86,6 @@ public class VectorSearchService {
             return cleanUri.toString();
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    @Transactional
-    void persistAll(Collection<DocumentEmbedding> docs, String baseUrl) {
-        DocumentEmbedding.delete(baseUrl);
-
-        for (var doc : docs) {
-            doc.persist();
         }
     }
 }
