@@ -2,6 +2,7 @@ package simplerag.service;
 
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -37,10 +38,15 @@ public class DocumentParser {
                 flushCurrentSection(result, headingStack, currentSectionContent, url);
 
                 int currentLevel = getHeadingLevel(element.tagName());
+
+                String anchor = element.id();
+                if (anchor.isEmpty()) anchor = element.attr("name");
+                if (anchor.isEmpty()) anchor = null;
+
                 while (!headingStack.isEmpty() && headingStack.peek().level() >= currentLevel) {
                     headingStack.pop();
                 }
-                headingStack.push(new HeadingInfo(currentLevel, element.text()));
+                headingStack.push(new HeadingInfo(currentLevel, element.text(), anchor));
             } else {
                 if (node instanceof TextNode textNode) {
                     currentSectionContent.append(textNode.getWholeText());
@@ -111,30 +117,36 @@ public class DocumentParser {
     ) {
         String content = contentBuilder.toString().trim();
         contentBuilder.setLength(0);
-        
-        // Пропускаем заголовки без контента
+
         if (content.isEmpty() || headingStack.isEmpty()) return;
 
-        // Строим путь в формате: Heading1. NestedHeading2. NestedHeading3
         List<String> pathParts = headingStack.stream()
                 .map(HeadingInfo::text)
                 .toList()
-                .reversed(); // Deque iteration goes top-to-bottom (newest first), so reverse it
+                .reversed();
 
-        // Возможно, было бы полезно вставить в каждый эмбеддинг эту часть.
-        // Но тут может быть довольно много лишних токенов, так что скипаем
         if (pathParts.size() >= 2 && pathParts.get(1).equals("Related content")) return;
 
+        // peekFirst() — текущий заголовок (самый глубокий)
+        String anchor = headingStack.peekFirst().anchor();
+
         var doc = new DocumentEmbedding();
+
         doc.id = new DocumentEmbeddingId();
         doc.id.sectionName = String.join(". ", pathParts);
         doc.id.url = url;
+
+        doc.metadata = new HashMap<>(4);
+        doc.metadata.put("title", pathParts.getLast());
+        if (anchor != null) {
+            doc.metadata.put("anchor", anchor);
+        }
+
         doc.content = pathParts.getLast() + content;
-        doc.metadata = Map.of("title", pathParts.getLast());
         doc.embedding = embeddingModel.embed("# " + doc.id.sectionName + content).content().vector();
 
         sections.add(doc);
     }
 
-    private record HeadingInfo(int level, String text) {}
+    private record HeadingInfo(int level, String text, @Nullable String anchor) {}
 }

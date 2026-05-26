@@ -30,9 +30,14 @@ public class VectorSearchService {
     public List<DocumentDto> vectorSearch(String query, int max) {
         Embedding embedding = embeddingModel.embed(query).content();
         var results = DocumentEmbedding.findClosest(embedding, max);
-        return results.stream().map((doc) ->
-                new DocumentDto(
-                        doc.id.url,
+        return results.stream().map((doc) -> {
+                var url =  doc.id.url;
+                var anchor = doc.metadata.get("anchor");
+                if (anchor != null) {
+                    url = url + "#" + anchor;
+                }
+                return new DocumentDto(
+                        url,
                         doc.id.sectionName,
                         doc.content,
                         doc.metadata
@@ -42,7 +47,8 @@ public class VectorSearchService {
                                         Map.Entry::getKey,
                                         entry -> entry.getValue().toString()
                                 ))
-                )
+                );
+            }
         ).toList();
     }
 

@@ -11,6 +11,7 @@
 Приложение позволяет индексировать произвольные HTML-документы с помощью метода `POST ai/ingest`:
 
 - Документ разбивается на чанки по `<h>`-тегам.
+- Если для раздела задан якорь (anchor), он сохраняется в метаданных для выдачи более точных URL.
 - Нерелевантные разделы фильтруются.
 - Для каждого чанка сохраняется путь из `<h>`-тегов.
 - HTML каждого чанка преобразуется в Markdown.
@@ -53,6 +54,14 @@ curl -X POST http://localhost:8080/ai/ask --url-query "q=What if multiple beans 
 
 Ответ:
 
-```text
-If multiple beans declare the same type, exactly one bean must be assignable to an injection point for it to work correctly. If none of the beans are assignable, the build will fail with an `UnsatisfiedResolutionException`. If multiple beans are assignable, the build will fail with an `AmbiguousResolutionException`.
+```json
+{
+  "response": "If multiple beans declare the same type, exactly one bean must be assignable to an injection point, otherwise the build fails. If none of the beans are assignable, the build fails with `UnsatisfiedResolutionException`. If multiple beans are assignable, the build fails with `AmbiguousResolutionException`.",
+  "urls":
+  [
+    "https://quarkus.io/guides/cdi#hm-wait-a-minute-what-happens-if-multiple-beans-declare-the-same-type",
+    "https://quarkus.io/guides/cdi#ok-you-said-that-there-are-several-kinds-of-beans",
+    "https://quarkus.io/guides/cdi#typesafe_resolution"
+  ]
+}
 ```
