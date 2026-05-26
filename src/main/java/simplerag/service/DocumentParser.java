@@ -1,35 +1,36 @@
 package simplerag.service;
 
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
-import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.DocumentSplitter;
-import dev.langchain4j.data.document.Metadata;
-import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
+import simplerag.dao.DocumentEmbedding;
+import simplerag.dao.DocumentEmbeddingId;
 
 import java.util.*;
 
 @ApplicationScoped
-class HtmlDocumentSplitter implements DocumentSplitter {
+public class DocumentParser {
     private final FlexmarkHtmlConverter converter = FlexmarkHtmlConverter.builder().build();
 
-    @Override
-    public List<TextSegment> split(Document document) {
-        String url = document.metadata().getString("url");
-        Element body = Jsoup.parse(document.text()).body();
+    private final EmbeddingModel embeddingModel;
 
-        List<TextSegment> result = new ArrayList<>();
+    DocumentParser(EmbeddingModel embeddingModel) {
+        this.embeddingModel = embeddingModel;
+    }
+
+    public List<DocumentEmbedding> parse(Document doc, String url) {
+        List<DocumentEmbedding> result = new ArrayList<>();
 
         Deque<HeadingInfo> headingStack = new ArrayDeque<>();
         StringBuilder currentSectionContent = new StringBuilder();
 
         // Убираем структурные div. Итерируемся depth-first, чтобы получить физический порядок тегов
-        List<Node> flatNodes = flattenDom(body);
+        List<Node> flatNodes = flattenDom(doc.body());
 
         for (Node node : flatNodes) {
             if (node instanceof Element element && isHeading(element)) {
@@ -109,13 +110,11 @@ class HtmlDocumentSplitter implements DocumentSplitter {
     }
 
     private void flushCurrentSection(
-            List<TextSegment> sections,
+            List<DocumentEmbedding> sections,
             Deque<HeadingInfo> headingStack,
             StringBuilder contentBuilder,
             String url
     ) {
-        Objects.requireNonNull(url);
-
         String content = contentBuilder.toString().trim();
         contentBuilder.setLength(0);
 
@@ -130,21 +129,28 @@ class HtmlDocumentSplitter implements DocumentSplitter {
 
         // peekFirst() — текущий заголовок (самый глубокий)
         String anchor = headingStack.peekFirst().anchor();
-        String sectionName = String.join(". ", pathParts);
 
-        var meta = Metadata.from(Map.of(
-                "sectionName", sectionName,
-                "url", url,
-                "title", pathParts.getLast()
-        ));
+        var doc = new DocumentEmbedding();
 
+        doc.id = new DocumentEmbeddingId();
+        doc.id.sectionName = String.join(". ", pathParts);
+        doc.id.url = url;
+
+        doc.metadata = new HashMap<>(4);
+        doc.metadata.put("title", pathParts.getLast());
         if (anchor != null) {
-            meta.put("anchor", anchor);
+            doc.metadata.put("anchor", anchor);
         }
 
-        sections.add(TextSegment.from("# %s\n\n%s".formatted(sectionName, content), meta));
+        doc.content = pathParts.getLast() + content;
+
+        doc.embedding = embeddingModel
+                .embed("# %s\n\n%s".formatted(doc.id.sectionName, content))
+                .content()
+                .vector();
+
+        sections.add(doc);
     }
 
-    private record HeadingInfo(int level, String text, @Nullable String anchor) {
-    }
+    private record HeadingInfo(int level, String text, @Nullable String anchor) {}
 }
