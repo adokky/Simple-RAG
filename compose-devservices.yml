@@ -1,0 +1,19 @@
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    container_name: simplerag_pg18
+    healthcheck:
+      test: pg_isready -U ${DB_USER} -d ${DB_NAME}
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    ports:
+      - '5432:5432'
+    # ускоряем работу БД в dev-режиме
+    command: [ "postgres", "-c", "fsync=off", "-c", "full_page_writes=off" ]
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d/
