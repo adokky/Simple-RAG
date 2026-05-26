@@ -10,6 +10,8 @@ import org.jsoup.nodes.Document;
 import simplerag.dao.DocumentEmbedding;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collection;
 import java.util.List;
@@ -53,7 +55,7 @@ public class VectorSearchService {
     }
 
     public int ingest(URL targetUrl) {
-        var urlString = targetUrl.toString();
+        String urlString = formatUrl(targetUrl);
 
         Document doc;
         try {
@@ -66,14 +68,26 @@ public class VectorSearchService {
 
         var docs = documentParser.parse(doc, urlString);
 
-        persistAll(docs);
+        persistAll(docs, urlString);
 
         return docs.size();
     }
 
+    private static String formatUrl(URL targetUrl) {
+        try {
+            var uri = targetUrl.toURI();
+            var cleanUri = new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null);
+            return cleanUri.toString();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Transactional
-    void persistAll(Collection<DocumentEmbedding> docs) {
-        for (var doc : docs ) {
+    void persistAll(Collection<DocumentEmbedding> docs, String baseUrl) {
+        DocumentEmbedding.delete(baseUrl);
+
+        for (var doc : docs) {
             doc.persist();
         }
     }

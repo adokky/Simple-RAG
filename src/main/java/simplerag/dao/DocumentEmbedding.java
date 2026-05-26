@@ -40,4 +40,9 @@ public class DocumentEmbedding extends PanacheEntityBase {
                 .setMaxResults(maxResults)
                 .getResultList();
     }
+
+    public static int delete(String baseUrl) {
+        long deleted = DocumentEmbedding.delete("DELETE FROM DocumentEmbedding WHERE id.url=?1", baseUrl);
+        return Math.toIntExact(deleted);
+    }
 }

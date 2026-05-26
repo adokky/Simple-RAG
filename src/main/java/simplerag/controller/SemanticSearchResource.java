@@ -35,8 +35,9 @@ public class SemanticSearchResource {
             AskResultDto result = semanticSearchService.askWithContext(userQuestion);
             return Response.ok(result).build();
         } catch (Exception e) {
+            e.printStackTrace();
             return Response.serverError()
-                    .entity("Ошибка при обработке RAG-задачи: " + e.getMessage()).build();
+                    .entity("Ошибка при обработке RAG-задачи").build();
         }
     }
 
@@ -68,6 +69,7 @@ public class SemanticSearchResource {
             int count = vectorSearchService.ingest(targetUrl);
             return Response.ok("Успешно собрано, загружено и разрезано на " + count + " структурных эмбеддингов").build();
         } catch (Exception e) {
+            e.printStackTrace();
             return Response.serverError().entity("Ошибка при обработке сбора данных").build();
         }
     }
