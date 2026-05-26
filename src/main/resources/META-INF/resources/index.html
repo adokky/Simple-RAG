@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>AI Assistant</title>
+    <!-- Парсинг Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background-color: #f5f7fa;
+          color: #333;
+          display: flex;
+          justify-content: center;
+          padding: 40px 20px;
+          margin: 0;
+        }
+        .container {
+          width: 100%;
+          max-width: 600px;
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+        }
+        h1 {
+          text-align: center;
+          color: #2c3e50;
+          margin-bottom: 20px;
+          font-weight: 500;
+        }
+        input[type="text"] {
+          width: 100%;
+          padding: 14px;
+          font-size: 16px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          box-sizing: border-box;
+          margin-bottom: 20px;
+          transition: border 0.3s;
+        }
+        input[type="text"]:focus {
+          border-color: #3498db;
+          outline: none;
+          box-shadow: 0 0 6px rgba(52, 152, 219, 0.3);
+        }
+        .response {
+          margin-top: 20px;
+          padding: 16px;
+          background-color: #f1f3f5;
+          border-radius: 8px;
+          min-height: 20px;
+          font-size: 16px;
+          color: #2d3748;
+          line-height: 1.6;
+        }
+        .response a {
+          color: #3498db;
+          text-decoration: none;
+        }
+        .response a:hover {
+          text-decoration: underline;
+        }
+        .response pre {
+          background: #f8f9fa;
+          padding: 12px;
+          border-radius: 6px;
+          overflow: auto;
+          font-family: 'Courier New', monospace;
+          border: 1px solid #ddd;
+        }
+        .response code {
+          font-family: 'Courier New', monospace;
+          background: #f0f0f0;
+          padding: 2px 5px;
+          border-radius: 3px;
+          font-size: 0.9em;
+        }
+        .response blockquote {
+          border-left: 4px solid #3498db;
+          margin: 0;
+          padding-left: 15px;
+          color: #555;
+          font-style: italic;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>💬 AI Assistant</h1>
+    <input type="text" id="prompt" placeholder="Введите ваш вопрос..." />
+    <div id="response" class="response">Ответ появится здесь...</div>
+</div>
+
+<script>
+    const input = document.getElementById('prompt');
+    const response = document.getElementById('response');
+
+    input.addEventListener('keypress', async (e) => {
+      if (e.key === 'Enter') {
+        const query = input.value.trim();
+        if (!query) return;
+
+        response.textContent = 'Загрузка...';
+
+        try {
+          const url = new URL('/ai/ask', window.location.origin);
+          url.searchParams.append('q', query);
+
+          const res = await fetch(url.toString(), {
+            method: 'POST', // Теперь используем GET
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const data = await res.json();
+
+          let responseHtml = '<div>' + marked.parse(data.response || 'Нет ответа.') + '</div>';
+
+          if (data.links && data.links.length > 0) {
+            responseHtml += '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 14px;">';
+            responseHtml += '<strong>Источники:</strong><br>';
+            data.links.forEach(link => {
+              responseHtml += `<a href="${link}" target="_blank">→ ${link}</a><br>`;
+            });
+            responseHtml += '</div>';
+          }
+          
+          response.innerHTML = responseHtml;
+        } catch (err) {
+          response.textContent = 'Ошибка: не удалось получить ответ.';
+          console.error(err);
+        }
+      }
+    });
+</script>
+</body>
+</html>

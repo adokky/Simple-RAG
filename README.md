@@ -48,11 +48,15 @@ curl -X POST http://localhost:8080/ai/ingest --url-query "url=https://quarkus.io
 ```
 
 ### Задать вопрос
+
+В UI: http://localhost:8080/
+
+Или использовать curl:
 ```bash
 curl -X POST http://localhost:8080/ai/ask --url-query "q=What if multiple beans declare same type"
 ```
 
-Сырой ответ:
+Ответ:
 
 ```json
 {
@@ -66,26 +70,4 @@ curl -X POST http://localhost:8080/ai/ask --url-query "q=What if multiple beans 
 }
 ```
 
-Форматированный ответ:
-
-If multiple beans declare the same type, the CDI container will fail the build if this causes ambiguity at any injection point. Specifically:
-
-- If **none** of the beans is assignable to the injection point, the build fails with `UnsatisfiedResolutionException`.
-- If **multiple** beans are assignable, the build fails with `AmbiguousResolutionException`.
-
-This behavior is intentional because it helps identify and resolve unresolved dependencies early, allowing the application to fail fast.
-
-In case of ambiguity, you can use programmatic lookup via `jakarta.enterprise.inject.Instance<T>` at runtime to iterate over all beans implementing the required type and resolve ambiguities.
-
-For example:
-
-```java
-@Inject
-Instance<Dictionary> dictionaries; // non-ambiguous by design
-
-String translate(String sentence) {
-    for (Dictionary dict : dictionaries) {
-        // Use the selected Dictionary implementation as needed
-    }
-}
-```
+![screenshot](screen.jpg "Simple web UI")
